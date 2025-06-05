@@ -1,0 +1,243 @@
+#!/bin/bash
+
+# acp - Advanced copy with zoxide integration
+# Usage: acp [options] <file1> [file2] ... [fileN]
+
+set -e
+
+# Default values
+mode=""
+show_help=false
+
+# Check for default mode from environment variable or config file
+if [ -n "$ACP_DEFAULT_MODE" ]; then
+    mode="$ACP_DEFAULT_MODE"
+elif [ -f "$HOME/.acprc" ]; then
+    # Read default mode from config file
+    default_mode=$(grep "^default_mode=" "$HOME/.acprc" 2>/dev/null | cut -d'=' -f2)
+    if [ -n "$default_mode" ]; then
+        mode="$default_mode"
+    fi
+fi
+
+# Function to show help
+show_usage() {
+    cat << EOF
+acp - Advanced copy with zoxide integration
+
+Usage: acp [options] <file1> [file2] ... [fileN]
+
+Options:
+    -z, --zoxide        Use zoxide for destination selection
+    -b, --browse        Browse filesystem from current directory
+    -h, --home          Browse filesystem from home directory
+    -m, --manual        Specify file and destination: acp -m <file> <destination>
+    --set-default MODE  Set default mode (zoxide, browse, home, manual)
+    --help              Show this help message
+
+Default behavior:
+    The script will use the default mode if set via:
+    1. --set-default flag (saves to ~/.acprc)
+    2. ACP_DEFAULT_MODE environment variable
+    3. default_mode setting in ~/.acprc
+    4. Interactive menu (if no default is set)
+
+If no option is specified and no default is set, an interactive menu will be shown.
+
+Examples:
+    acp document.pdf                    # Use default mode or interactive menu
+    acp -z *.txt                       # Use zoxide
+    acp --browse README.md config.json # Browse from current dir
+    acp -h important.doc               # Browse from home
+    acp -m file.txt ~/Downloads         # Copy file.txt to ~/Downloads
+    acp -m script.sh /tmp               # Copy script.sh to /tmp
+    acp -m document.pdf ./backup        # Copy document.pdf to ./backup
+    
+    # Set default modes:
+    acp --set-default zoxide           # Set zoxide as default
+    acp --set-default home             # Set home browsing as default
+    export ACP_DEFAULT_MODE=browse     # Set via environment variable
+EOF
+}
+
+# Parse command line arguments
+dest_path=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -z|--zoxide)
+            mode="zoxide"
+            shift
+            ;;
+        -b|--browse)
+            mode="browse"
+            shift
+            ;;
+        -h|--home)
+            mode="home"
+            shift
+            ;;
+        -m|--manual)
+            mode="manual"
+            shift
+            # Manual mode: first arg is file, second is destination
+            if [[ $# -lt 2 ]]; then
+                echo "Error: -m/--manual requires both file and destination"
+                echo "Usage: acp -m <file> <destination>"
+                exit 1
+            fi
+            # First argument is the file (will be processed with other files)
+            # Second argument is the destination
+            dest_path="$2"
+            # Remove the destination from arguments, leave file for normal processing
+            set -- "$1" "${@:3}"
+            ;;
+        --set-default)
+            if [ -z "$2" ]; then
+                echo "Error: --set-default requires a mode argument"
+                echo "Valid modes: zoxide, browse, home, manual"
+                exit 1
+            fi
+            case "$2" in
+                zoxide|browse|home|manual)
+                    echo "default_mode=$2" > "$HOME/.acprc"
+                    echo "Default mode set to: $2"
+                    echo "Configuration saved to ~/.acprc"
+                    exit 0
+                    ;;
+                *)
+                    echo "Error: Invalid mode '$2'"
+                    echo "Valid modes: zoxide, browse, home, manual"
+                    exit 1
+                    ;;
+            esac
+            ;;
+        --help)
+            show_usage
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+        *)
+            # This is a file argument, stop parsing options
+            break
+            ;;
+    esac
+done
+
+# Check if at least one file is provided
+if [ $# -eq 0 ]; then
+    echo "Error: No files specified"
+    echo
+    show_usage
+    exit 1
+fi
+
+# Validate that all arguments are existing files
+for file in "$@"; do
+    if [ ! -f "$file" ]; then
+        echo "Error: '$file' is not a valid file"
+        exit 1
+    fi
+done
+
+# Destination selection based on mode
+if [ -z "$mode" ]; then
+    # Interactive menu if no mode specified
+    echo "Select destination method:"
+    echo "1) Zoxide (frequent directories)"
+    echo "2) Browse filesystem (current directory)"
+    echo "3) Browse filesystem (home directory)"
+    echo "4) Enter path manually (interactive)"
+    echo -n "Choice (1-4): "
+    read -r choice
+
+    case $choice in
+        1) mode="zoxide" ;;
+        2) mode="browse" ;;
+        3) mode="home" ;;
+        4) mode="manual" ;;
+        *)
+            echo "Invalid choice. Please run again and select 1-4."
+            exit 1
+            ;;
+    esac
+fi
+
+# Execute the selected mode
+case $mode in
+    zoxide)
+        echo "Select from zoxide directories:"
+        if command -v zi >&/dev/null; then
+            dest=$(zi)
+        elif command -v zoxide >&/dev/null; then
+            dest=$(zoxide query -l | fzf --height=15 --reverse --prompt="Zoxide destination: ")
+        else
+            echo "Error: zoxide is not installed or not in PATH"
+            exit 1
+        fi
+        ;;
+    browse)
+        echo "Browse filesystem from current directory:"
+        if command -v fzf >&/dev/null; then
+            start_path="${PWD}"
+            echo "Browsing from: $start_path"
+            dest=$(find "$start_path" -type d \( -name node_modules -o -name .git -o -name __pycache__ -o -name .venv -o -name venv -o -name .next -o -name dist -o -name build -o -name target -o -name .gradle -o -name .mvn \) -prune -o -type d -print 2>/dev/null | sed "s|^$start_path/||" | sed "s|^$start_path$|.|" | fzf --height=15 --reverse --prompt="Browse destination: " | sed "s|^\\.|$start_path|")
+        else
+            echo "Error: fzf is required for filesystem browsing"
+            echo "Please install fzf or use manual entry (-m/--manual)"
+            exit 1
+        fi
+        ;;
+    home)
+        echo "Browse filesystem from home directory:"
+        if command -v fzf >&/dev/null; then
+            start_path="$HOME"
+            echo "Browsing from: $start_path"
+            # Include hidden directories and show them clearly
+            dest=$(find "$start_path" -type d \( -name node_modules -o -name .git -o -name __pycache__ -o -name .venv -o -name venv -o -name .next -o -name dist -o -name build -o -name target -o -name .gradle -o -name .mvn \) -prune -o -type d -print 2>/dev/null | sed "s|^$start_path/||" | sed "s|^$start_path$|~|" | fzf --height=15 --reverse --prompt="Browse destination: " | sed "s|^~|$start_path|")
+        else
+            echo "Error: fzf is required for filesystem browsing"
+            echo "Please install fzf or use manual entry (-m/--manual)"
+            exit 1
+        fi
+        ;;
+    manual)
+        if [ -n "$dest_path" ]; then
+            # Path was provided as argument
+            dest=$(eval echo "$dest_path")
+            echo "Using destination: $dest"
+        else
+            # This shouldn't happen with the new logic, but just in case
+            echo "Error: Manual mode requires a destination path"
+            echo "Usage: acp -m <destination> <file1> [file2] ..."
+            exit 1
+        fi
+        ;;
+esac
+
+# Check if destination was selected
+if [ -z "$dest" ]; then
+    echo "No destination selected. Aborting."
+    exit 1
+fi
+
+# Verify destination exists
+if [ ! -d "$dest" ]; then
+    echo "Error: Selected destination '$dest' is not a valid directory"
+    exit 1
+fi
+
+# Copy files
+echo "Copying to: $dest"
+for file in "$@"; do
+    echo "  $(basename "$file")"
+    cp "$file" "$dest/"
+done
+
+echo "Copy completed successfully!"
+
+# Add destination to zoxide database (in case it's a new path)
+z "$dest" >/dev/null 2>&1 || true
