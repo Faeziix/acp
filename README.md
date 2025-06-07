@@ -12,22 +12,20 @@ A smarter file copying tool that enhances the standard `cp` command with interac
 
 ## Installation
 
-1. Clone this repository:
-```bash
-git clone https://github.com/yourusername/acp.git
+
+### Shell one-line copy paste
+```sh
+curl -sL "https://raw.githubusercontent.com/faeziix/acp/main/PKGBUILD" | makepkg -si
+```
+
+
+### Manual Install
+```sh
+git clone https://github.com/faeziix/acp
 cd acp
+makepkg -si
 ```
 
-2. Make the script executable:
-```bash
-chmod +x acp
-```
-
-3. Add to your PATH:
-```bash
-# Add to ~/.bashrc or ~/.zshrc
-export PATH="$PATH:/path/to/acp"
-```
 
 ### Dependencies
 
