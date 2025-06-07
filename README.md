@@ -15,7 +15,7 @@ A smarter file copying tool that enhances the standard `cp` command with interac
 
 ### Shell one-line copy paste
 ```sh
-curl -sL "https://raw.githubusercontent.com/faeziix/acp/main/PKGBUILD" | makepkg -si
+curl -sL "https://raw.githubusercontent.com/faeziix/acp/main/install.sh" | sh
 ```
 
 
