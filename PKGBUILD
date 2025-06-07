@@ -1,5 +1,5 @@
 pkgname=acp
-pkgver=0.0.1
+pkgver=0.0.2
 pkgrel=1
 pkgdesc="Advanced cp with interactive directory selection using zoxide and fzf"
 arch=('any')
