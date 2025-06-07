@@ -184,7 +184,7 @@ case $mode in
         if command -v fzf >&/dev/null; then
             start_path="${PWD}"
             echo "Browsing from: $start_path"
-            dest=$(find "$start_path" -type d \( -name node_modules -o -name .git -o -name __pycache__ -o -name .venv -o -name venv -o -name .next -o -name dist -o -name build -o -name target -o -name .gradle -o -name .mvn \) -prune -o -type d -print 2>/dev/null | sed "s|^$start_path/||" | sed "s|^$start_path$|.|" | fzf --height=15 --reverse --prompt="Browse destination: " | sed "s|^\\.|$start_path|")
+            dest=$(find "$start_path" -type d \( -name node_modules -o -name .git -o -name __pycache__ -o -name .venv -o -name venv -o -name .next -o -name dist -o -name build -o -name target -o -name .gradle -o -name .mvn -o -name .cache \) -prune -o -type d -print 2>/dev/null | sed "s|^$start_path/||" | sed "s|^$start_path$|.|" | fzf --height=15 --reverse --prompt="Browse destination: " | sed "s|^\\.|$start_path|")
         else
             echo "Error: fzf is required for filesystem browsing"
             echo "Please install fzf or use manual entry (-m/--manual)"
@@ -197,7 +197,7 @@ case $mode in
             start_path="$HOME"
             echo "Browsing from: $start_path"
             # Include hidden directories and show them clearly
-            dest=$(find "$start_path" -type d \( -name node_modules -o -name .git -o -name __pycache__ -o -name .venv -o -name venv -o -name .next -o -name dist -o -name build -o -name target -o -name .gradle -o -name .mvn \) -prune -o -type d -print 2>/dev/null | sed "s|^$start_path/||" | sed "s|^$start_path$|~|" | fzf --height=15 --reverse --prompt="Browse destination: " | sed "s|^~|$start_path|")
+            dest=$(find "$start_path" -type d \( -name node_modules -o -name .git -o -name __pycache__ -o -name .venv -o -name venv -o -name .next -o -name dist -o -name build -o -name target -o -name .gradle -o -name .mvn -o -name .cache \) -prune -o -type d -print 2>/dev/null | sed "s|^$start_path/||" | sed "s|^$start_path$|~|" | fzf --height=15 --reverse --prompt="Browse destination: " | sed "s|^~|$start_path|" | sed "s|^\\([^/]\\)|$start_path/\\1|")
         else
             echo "Error: fzf is required for filesystem browsing"
             echo "Please install fzf or use manual entry (-m/--manual)"
